@@ -23,3 +23,6 @@ test('Breach command restores and recovers domain state',async({page})=>{await p
 
 
 test('Corporate actions restores a feasible decision',async({page})=>{await page.goto('/portfolios/PF-GLOBAL/actions/CA-117?ratio=2');await expect(page.getByRole('heading',{name:"Corporate action exposure workbench",exact:true})).toBeVisible();await expect(page.getByRole('region',{name:'Scenario result'})).toContainText(/Feasible|Blocked/);await expect(page.getByText("record dates",{exact:false}).first()).toBeVisible()});
+
+
+test('premium shell is keyboard and mobile ready',async({page})=>{await page.setViewportSize({width:390,height:844});await page.goto('/');await expect(page.getByRole('banner')).toBeVisible();await expect(page.getByRole('navigation',{name:'Product navigation'})).toBeVisible();await page.keyboard.press('Tab');await expect(page.getByRole('link',{name:'Skip to main content'})).toBeFocused();await page.getByRole('link',{name:'Skip to main content'}).press('Enter');await expect(page.locator('#main-content')).toBeFocused()});
