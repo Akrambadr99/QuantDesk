@@ -26,3 +26,6 @@ test('Corporate actions restores a feasible decision',async({page})=>{await page
 
 
 test('premium shell is keyboard and mobile ready',async({page})=>{await page.setViewportSize({width:390,height:844});await page.goto('/');await expect(page.getByRole('banner')).toBeVisible();await expect(page.getByRole('navigation',{name:'Product navigation'})).toBeVisible();await page.keyboard.press('Tab');await expect(page.getByRole('link',{name:'Skip to main content'})).toBeFocused();await page.getByRole('link',{name:'Skip to main content'}).press('Enter');await expect(page.locator('#main-content')).toBeFocused()});
+
+
+test('captures the premium desktop overview',async({page})=>{await page.setViewportSize({width:1440,height:1000});await page.goto('/');await expect(page.getByRole('banner')).toBeVisible();await page.screenshot({path:'../UI_SCREENSHOTS/QuantDesk-overview.png',fullPage:true})});
