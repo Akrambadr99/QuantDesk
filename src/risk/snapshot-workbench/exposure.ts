@@ -1,0 +1,2 @@
+export interface Demand{id:string;priority:number;amount:number}
+export function sectorExposure(demands:readonly Demand[],capacity:number){if(capacity<0)throw new Error('Sector exposure capacity cannot be negative.');let remaining=capacity;return demands.toSorted((a,b)=>b.priority-a.priority||a.id.localeCompare(b.id)).map(item=>{const granted=Math.min(Math.max(0,item.amount),remaining);remaining-=granted;return{...item,granted,shortfall:item.amount-granted}})}
