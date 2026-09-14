@@ -20,3 +20,6 @@ test('Risk snapshots evidence 3',async({page})=>{await page.goto('/portfolios/PF
 
 
 test('Breach command restores and recovers domain state',async({page})=>{await page.goto('/portfolios/PF-GLOBAL/snapshots/2026-09-21/breaches?scenario=RATES_UP&focus=BR-17');await expect(page.getByRole('heading',{name:"Portfolio breach command",exact:true})).toBeVisible();await page.getByLabel('Authority').selectOption("independent approver");await page.getByRole('button',{name:'Run domain bulk action'}).click();await expect(page.getByRole('status')).toContainText('1 succeeded; 1 require recovery');await expect(page.getByRole('button',{name:'Retry failed records'})).toBeVisible()});
+
+
+test('Corporate actions restores a feasible decision',async({page})=>{await page.goto('/portfolios/PF-GLOBAL/actions/CA-117?ratio=2');await expect(page.getByRole('heading',{name:"Corporate action exposure workbench",exact:true})).toBeVisible();await expect(page.getByRole('region',{name:'Scenario result'})).toContainText(/Feasible|Blocked/);await expect(page.getByText("record dates",{exact:false}).first()).toBeVisible()});
