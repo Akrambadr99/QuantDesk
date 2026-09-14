@@ -17,3 +17,6 @@ test('Risk snapshots deep workflow',async({page})=>{await page.goto('/portfolios
 test('Risk snapshots evidence 1',async({page})=>{await page.goto('/portfolios/PF-GLOBAL/snapshots/2026-09-14');await expect(page.getByText('Snapshot 2026-09-14',{exact:false}).first()).toBeVisible()});
 test('Risk snapshots evidence 2',async({page})=>{await page.goto('/portfolios/PF-GLOBAL/snapshots/2026-09-14');await expect(page.getByText('Stress -8.4%',{exact:false}).first()).toBeVisible()});
 test('Risk snapshots evidence 3',async({page})=>{await page.goto('/portfolios/PF-GLOBAL/snapshots/2026-09-14');await expect(page.getByText('Limit breach',{exact:false}).first()).toBeVisible()});
+
+
+test('Breach command restores and recovers domain state',async({page})=>{await page.goto('/portfolios/PF-GLOBAL/snapshots/2026-09-21/breaches?scenario=RATES_UP&focus=BR-17');await expect(page.getByRole('heading',{name:"Portfolio breach command",exact:true})).toBeVisible();await page.getByLabel('Authority').selectOption("independent approver");await page.getByRole('button',{name:'Run domain bulk action'}).click();await expect(page.getByRole('status')).toContainText('1 succeeded; 1 require recovery');await expect(page.getByRole('button',{name:'Retry failed records'})).toBeVisible()});
