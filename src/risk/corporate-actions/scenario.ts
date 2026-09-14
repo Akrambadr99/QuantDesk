@@ -1,0 +1,4 @@
+export interface ScenarioResult{primary:number;secondary:number;blocked:boolean;explanation:string;affected:readonly string[]}
+export function evaluateScenario(ratio:number){if(!Number.isFinite(ratio)||ratio<=0)throw new Error('Distribution ratio must be positive.');const originalShares=1200,price=48,fx=1.08,newShares=originalShares*ratio,exposure=Math.round(newShares*price*fx/1000),limit=125;return{primary:exposure,secondary:newShares,blocked:exposure>limit,explanation:exposure>limit?'Post-action exposure breaches the issuer mandate':'Entitlement remains inside the mandate',affected:['CA-117','POS-ACME',ratio>1.5?'FX-USD':'REC-22']}}
+export function mayCommit(role:string){return role==="independent approver"}
+export function appendDecision(history:readonly string[],role:string,result:ScenarioResult){if(!mayCommit(role))return history;return[...history,"Approve position transformation"+': '+result.explanation]}
