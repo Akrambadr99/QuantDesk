@@ -29,3 +29,8 @@ test('premium shell is keyboard and mobile ready',async({page})=>{await page.set
 
 
 test('captures the premium desktop overview',async({page})=>{await page.setViewportSize({width:1440,height:1000});await page.goto('/');await expect(page.getByRole('heading',{name:'QuantDesk command center'})).toBeVisible();await page.screenshot({path:'../UI_SCREENSHOTS/QuantDesk-overview.png',fullPage:true})});
+
+
+test('command workbench supports deep links and keyboard navigation',async({page})=>{await page.goto('/command-workbench?case=QD-816');await expect(page.getByRole('heading',{name:'Atlas concentration exception'})).toBeVisible();const queue=page.getByRole('listbox',{name:'risk breach queue'});await queue.focus();await page.keyboard.press('ArrowDown');await expect(page).toHaveURL(/case=QD-823/)});
+
+test('command workbench preserves conflict context',async({page})=>{await page.goto('/command-workbench?case=QD-816');await page.getByLabel('Authority').selectOption('approver');await page.getByLabel(/Decision note/).fill('Preserve this reviewed operational evidence');await page.getByRole('button',{name:'Authorize remediation'}).click();await expect(page.getByRole('alert')).toContainText('Newer server version');await page.getByRole('button',{name:'Load latest version'}).click();await expect(page.getByLabel(/Decision note/)).toHaveValue('Preserve this reviewed operational evidence')});
