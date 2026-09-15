@@ -1,0 +1,5 @@
+export interface OperationalNode{id:string;label:string;capacity:number;demand:number;dependsOn:string[];effectiveFrom:string;effectiveTo:string;version:number}
+export const operationalNodes:OperationalNode[]=[{"id":"QD-810","label":"Duration breach","capacity":12,"demand":8,"dependsOn":[],"effectiveFrom":"2026-09-01","effectiveTo":"2026-12-31","version":2},{"id":"QD-816","label":"Concentration exception","capacity":9,"demand":11,"dependsOn":["QD-810"],"effectiveFrom":"2026-09-01","effectiveTo":"2026-09-20","version":3},{"id":"QD-823","label":"FX hedge shortfall","capacity":8,"demand":12,"dependsOn":["QD-816"],"effectiveFrom":"2026-09-18","effectiveTo":"2026-12-31","version":4},{"id":"QD-829","label":"Liquidity buffer","capacity":11,"demand":5,"dependsOn":["QD-810"],"effectiveFrom":"2026-09-01","effectiveTo":"2026-12-31","version":5}];
+export const scenarioModes=["Latest close","Intraday stressed","Mandate conservative"] as const;
+export const metricLabels=["Net exposure","Mandate headroom","Stale positions"] as const;
+export const domainCoefficient=4.1;export const secondaryWeight=19;export const riskWeight=7;
