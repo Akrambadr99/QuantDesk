@@ -12,7 +12,7 @@ test('approved risk snapshot governs corporate action and cannot be revoked afte
   await page.goto('/portfolios/PF-GLOBAL/actions/CA-117?ratio=1')
   await page.getByLabel('Decision authority').selectOption('independent approver')
   await page.getByRole('button', { name: 'Approve position transformation' }).click()
-  await expect(page.getByText('Transformation applied')).toBeVisible()
+  await expect(page.getByRole('status')).toContainText('Position transformation applied')
   await page.goto('/portfolios/PF-GLOBAL/snapshots/2026-09-14')
   await page.getByRole('button', { name: 'Revoke risk approval' }).click()
   await expect(page.getByRole('status')).toContainText('Corporate action depends')

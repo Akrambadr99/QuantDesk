@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { MemoryStorage } from '../../data/memory-storage'
-import { applyTransformation, approveRisk, corporateActionBlockers, readRiskLedger, refreshRiskQuotes, revokeRiskApproval, saveRiskLedger } from './riskLedger'
+import { applyTransformation, applyTransformationAtRevision, approveRisk, corporateActionBlockers, evaluateRiskRevision, readRiskLedger, refreshRiskQuotes, revokeRiskApproval, saveRiskLedger } from './riskLedger'
 describe('risk approval to corporate action', () => {
   it('persists independent approval and changes transformation eligibility', () => {
     const storage = new MemoryStorage()
@@ -15,5 +15,14 @@ describe('risk approval to corporate action', () => {
     const transformed = applyTransformation(approved)
     expect(() => revokeRiskApproval(transformed)).toThrow(/depends/)
     expect(transformed.history.map(item => item.source)).toEqual(['risk-snapshot', 'risk-snapshot', 'corporate-action'])
+  })
+  it('rejects a stale reviewed revision and suppresses duplicate transformation requests', () => {
+    const oldRevision = readRiskLedger(new MemoryStorage()).revision
+    const approved = approveRisk(refreshRiskQuotes(readRiskLedger(new MemoryStorage())), 'R. Shah', true)
+    expect(evaluateRiskRevision(approved, oldRevision)).toMatchObject({ allowed: false, resolutionOptions: ['Review current risk snapshot'] })
+    expect(() => applyTransformationAtRevision(approved, oldRevision, 'CA-117')).toThrow(/changed/)
+    const applied = applyTransformationAtRevision(approved, approved.revision, 'CA-117')
+    expect(applyTransformationAtRevision(applied, approved.revision, 'CA-117')).toBe(applied)
+    expect(() => applyTransformationAtRevision(applied, applied.revision, 'CA-118')).toThrow(/already applied/)
   })
 })
