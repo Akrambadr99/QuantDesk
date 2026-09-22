@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { issuerWeights, riskFindings, snapshotValue } from './riskSnapshot'
-import { approveRisk, readRiskLedger, refreshRiskQuotes, revokeRiskApproval, saveRiskLedger } from './riskLedger'
+import { approveRisk, readRiskLedger, refreshRiskQuotes, revokeRiskApproval, riskApprovalPolicy, saveRiskLedger } from './riskLedger'
 export function PortfolioRiskSnapshotPage() {
   const { portfolioId, asOf } = useParams()
   const [ledger, setLedger] = useState(() => readRiskLedger(window.localStorage))
@@ -10,6 +10,7 @@ export function PortfolioRiskSnapshotPage() {
   const [independent, setIndependent] = useState(false)
   const [notice, setNotice] = useState('')
   const findings = riskFindings(snapshot)
+  const approvalPolicy = riskApprovalPolicy(ledger, actor, independent)
   function refreshQuotes() {
     setLedger(saveRiskLedger(window.localStorage, refreshRiskQuotes(ledger)))
     setNotice('Price evidence refreshed in the working revision; original snapshot remains unchanged.')
@@ -42,9 +43,11 @@ export function PortfolioRiskSnapshotPage() {
       <ul>{findings.map(item => <li key={item.code + item.detail}><strong>{item.code}</strong> · {item.detail}</li>)}</ul>
       {findings.length === 0 && <p>No mandate findings.</p>}
       <button onClick={refreshQuotes} disabled={!findings.some(item => item.code === 'STALE_PRICE')}>Refresh stale quote evidence</button>
+      <p>Snapshot maker: {ledger.maker} · Approval queue: {approvalPolicy.queue}</p>
       <label>Independent approver <input value={actor} onChange={event => { setActor(event.target.value); }} /></label>
       <label><input type="checkbox" checked={independent} onChange={event => { setIndependent(event.target.checked); }} /> Independent from portfolio manager</label>
-      <button disabled={Boolean(snapshot.approvedBy)} onClick={approve}>Approve snapshot</button>
+      <button disabled={!approvalPolicy.allowed} onClick={approve}>Approve snapshot</button>
+      {actor && independent && approvalPolicy.blockers.map(item => <p key={item}>{item}</p>)}
       {snapshot.approvedBy && <button onClick={revoke}>Revoke risk approval</button>}
       <p>{snapshot.approvedBy ? `Approved by ${snapshot.approvedBy}` : 'Approval pending'}</p>
       <p>Risk revision {ledger.revision} · Corporate action {ledger.transformationApplied ? 'applied' : 'pending'}</p>

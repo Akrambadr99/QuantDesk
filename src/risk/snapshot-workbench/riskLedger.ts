@@ -4,13 +4,15 @@ import type { RiskSnapshot } from './riskSnapshot'
 
 export interface RiskLedger {
   snapshot: RiskSnapshot
+  maker: string
+  approvalRevision: number | null
   transformationApplied: boolean
   transformationRequestId: string | null
   revision: number
-  history: readonly { revision: number; action: string; source: string }[]
+  history: readonly { revision: number; action: string; source: string; actor?: string }[]
 }
 const key = 'quantdesk:pf-global:risk-approval:v1'
-export const initialRiskLedger: RiskLedger = { snapshot: baselineSnapshot, transformationApplied: false, transformationRequestId: null, revision: 0, history: [] }
+export const initialRiskLedger: RiskLedger = { snapshot: baselineSnapshot, maker: 'portfolio manager', approvalRevision: null, transformationApplied: false, transformationRequestId: null, revision: 0, history: [] }
 export function readRiskLedger(storage: StoragePort): RiskLedger {
   const raw = storage.getItem(key)
   if (!raw) return initialRiskLedger
@@ -20,21 +22,34 @@ export function readRiskLedger(storage: StoragePort): RiskLedger {
     !('transformationApplied' in value) || typeof value.transformationApplied !== 'boolean' ||
     !('revision' in value) || typeof value.revision !== 'number' ||
     !('history' in value) || !Array.isArray(value.history)) throw new Error('Invalid risk-ledger record.')
-  const record = value as RiskLedger
-  return { ...record, transformationRequestId: record.transformationRequestId ?? null }
+  const record = value as Omit<RiskLedger, 'maker' | 'approvalRevision'> & Partial<Pick<RiskLedger, 'maker' | 'approvalRevision'>>
+  return { ...record, maker: record.maker ?? 'portfolio manager', approvalRevision: record.approvalRevision ?? null, transformationRequestId: record.transformationRequestId ?? null }
 }
-function event(state: RiskLedger, action: string, source: string, snapshot = state.snapshot): RiskLedger {
+function event(state: RiskLedger, action: string, source: string, snapshot = state.snapshot, actor?: string): RiskLedger {
   const revision = state.revision + 1
-  return { ...state, snapshot, revision, history: [...state.history, { revision, action, source }] }
+  return { ...state, snapshot, revision, history: [...state.history, { revision, action, source, ...(actor ? { actor } : {}) }] }
 }
-export function refreshRiskQuotes(state: RiskLedger): RiskLedger {
+export function refreshRiskQuotes(state: RiskLedger, actor = 'portfolio manager'): RiskLedger {
   if (state.snapshot.approvedBy) throw new Error('Approved snapshot quotes cannot be edited.')
+  if (!actor.trim()) throw new Error('Risk maker identity is required.')
   const snapshot = { ...state.snapshot, positions: state.snapshot.positions.map(position =>
     position.quotedAt < state.snapshot.asOf ? { ...position, quotedAt: state.snapshot.asOf } : position) }
-  return event(state, 'quotes-refreshed', 'risk-snapshot', snapshot)
+  return { ...event(state, 'quotes-refreshed', 'risk-snapshot', snapshot, actor), maker: actor, approvalRevision: null }
+}
+export function riskApprovalPolicy(state: RiskLedger, actor: string, independent: boolean): { allowed: boolean; blockers: string[]; queue: 'maker' | 'independent-review' | 'corporate-action' } {
+  const blockers: string[] = []
+  if (!actor.trim()) blockers.push('Approver identity is required.')
+  if (!independent) blockers.push('Independent risk approval is required.')
+  if (actor.trim().toLowerCase() === state.maker.trim().toLowerCase()) blockers.push('Risk maker cannot approve their own snapshot.')
+  if (state.snapshot.approvedBy) blockers.push('Risk snapshot is already approved.')
+  if (state.snapshot.positions.some(position => position.quotedAt < state.snapshot.asOf)) blockers.push('Stale prices must be refreshed before approval.')
+  return { allowed: blockers.length === 0, blockers, queue: state.snapshot.approvedBy ? 'corporate-action' : blockers.some(item => item.includes('Stale prices')) ? 'maker' : 'independent-review' }
 }
 export function approveRisk(state: RiskLedger, actor: string, independent: boolean): RiskLedger {
-  return event(state, 'approved', 'risk-snapshot', approveSnapshot(state.snapshot, actor, independent))
+  const policy = riskApprovalPolicy(state, actor, independent)
+  if (!policy.allowed) throw new Error(policy.blockers[0])
+  const next = event(state, 'approved', 'risk-snapshot', approveSnapshot(state.snapshot, actor, independent), actor)
+  return { ...next, approvalRevision: next.revision }
 }
 export function corporateActionBlockers(state: RiskLedger): string[] {
   return state.snapshot.approvedBy ? [] : ['An independently approved risk snapshot is required before position transformation.']
