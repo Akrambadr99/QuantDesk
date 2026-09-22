@@ -2,11 +2,13 @@ import { useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { issuerWeights, riskFindings, snapshotValue } from './riskSnapshot'
 import { approveRisk, checkerInbox, readRiskLedger, refreshRiskQuotes, requestRiskReview, revokeRiskApproval, riskApprovalPolicy, saveRiskLedger } from './riskLedger'
+import { claimRiskReview, checkerWorkInbox, riskCheckers } from './checkerWorkload'
 export function PortfolioRiskSnapshotPage() {
   const { portfolioId, asOf } = useParams()
   const [ledger, setLedger] = useState(() => readRiskLedger(window.localStorage))
   const snapshot = ledger.snapshot
   const [actor, setActor] = useState('')
+  const [checkerId, setCheckerId] = useState('')
   const [independent, setIndependent] = useState(false)
   const [notice, setNotice] = useState('')
   const findings = riskFindings(snapshot)
@@ -22,7 +24,7 @@ export function PortfolioRiskSnapshotPage() {
     } catch (error) { setNotice(error instanceof Error ? error.message : 'Approval failed.') }
   }
   function requestReview() {
-    try { setLedger(saveRiskLedger(window.localStorage, requestRiskReview(ledger, ledger.maker, actor))); setNotice('Risk review assigned to independent checker.') }
+    try { setLedger(saveRiskLedger(window.localStorage, requestRiskReview(ledger, ledger.maker, 'risk checker'))); setNotice('Risk review placed in the independent checker queue.') }
     catch (error) { setNotice(error instanceof Error ? error.message : 'Review request failed.') }
   }
   function revoke() {
@@ -48,13 +50,19 @@ export function PortfolioRiskSnapshotPage() {
       {findings.length === 0 && <p>No mandate findings.</p>}
       <button onClick={refreshQuotes} disabled={!findings.some(item => item.code === 'STALE_PRICE')}>Refresh stale quote evidence</button>
       <p>Snapshot maker: {ledger.maker} · Approval queue: {approvalPolicy.queue}</p>
-      <label>Independent approver <input value={actor} onChange={event => { setActor(event.target.value); }} /></label>
-      <button onClick={requestReview} disabled={!actor.trim() || Boolean(snapshot.approvedBy)}>Request independent review</button>
+      <label>Independent approver <input value={actor} onChange={event => { setActor(event.target.value); setCheckerId('') }} /></label>
+      <label>Qualified checker <select value={checkerId} onChange={event => { setCheckerId(event.target.value); setActor(event.target.value) }}><option value="">Select checker</option>{riskCheckers.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>
+      <button onClick={requestReview} disabled={Boolean(snapshot.approvedBy)}>Request independent review</button>
+      <button onClick={() => { try { const next = claimRiskReview({ portfolioId: portfolioId ?? 'PF-GLOBAL', mandateId: 'global', ledger }, checkerId,
+        [{ portfolioId: portfolioId ?? 'PF-GLOBAL', mandateId: 'global', ledger }], ledger.revision)
+        setLedger(saveRiskLedger(window.localStorage, next)); setNotice('Risk review claimed by named checker.')
+      } catch (error) { setNotice(error instanceof Error ? error.message : 'Claim failed.') } }} disabled={!checkerId}>Claim checker work</button>
       <label><input type="checkbox" checked={independent} onChange={event => { setIndependent(event.target.checked); }} /> Independent from portfolio manager</label>
       <button disabled={!approvalPolicy.allowed} onClick={approve}>Approve snapshot</button>
       {(ledger.riskReviews ?? []).length > 0 && <div aria-label="Risk review inbox">
         <h3>Checker worklist</h3>{(ledger.riskReviews ?? []).map(item => <p key={item.id}>{item.id} · {item.assignee} · {item.status} · snapshot revision {item.sourceRevision}</p>)}
         <p>{checkerInbox(ledger, actor).length} assigned to current checker</p>
+        <p>{checkerWorkInbox([{ portfolioId: portfolioId ?? 'PF-GLOBAL', mandateId: 'global', ledger }]).length} open across the visible portfolio</p>
       </div>}
       {actor && independent && approvalPolicy.blockers.map(item => <p key={item}>{item}</p>)}
       {snapshot.approvedBy && <button onClick={revoke}>Revoke risk approval</button>}
