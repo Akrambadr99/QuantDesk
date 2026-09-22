@@ -1,23 +1,28 @@
 import { useState } from 'react'
 import { useParams } from 'react-router-dom'
-import { approveSnapshot, baselineSnapshot, issuerWeights, riskFindings, snapshotValue } from './riskSnapshot'
+import { issuerWeights, riskFindings, snapshotValue } from './riskSnapshot'
+import { approveRisk, readRiskLedger, refreshRiskQuotes, revokeRiskApproval, saveRiskLedger } from './riskLedger'
 export function PortfolioRiskSnapshotPage() {
   const { portfolioId, asOf } = useParams()
-  const [snapshot, setSnapshot] = useState(baselineSnapshot)
+  const [ledger, setLedger] = useState(() => readRiskLedger(window.localStorage))
+  const snapshot = ledger.snapshot
   const [actor, setActor] = useState('')
   const [independent, setIndependent] = useState(false)
   const [notice, setNotice] = useState('')
   const findings = riskFindings(snapshot)
   function refreshQuotes() {
-    setSnapshot(current => ({ ...current, positions: current.positions.map(position =>
-      position.quotedAt < current.asOf ? { ...position, quotedAt: current.asOf } : position) }))
+    setLedger(saveRiskLedger(window.localStorage, refreshRiskQuotes(ledger)))
     setNotice('Price evidence refreshed in the working revision; original snapshot remains unchanged.')
   }
   function approve() {
     try {
-      setSnapshot(current => approveSnapshot(current, actor, independent))
+      setLedger(saveRiskLedger(window.localStorage, approveRisk(ledger, actor, independent)))
       setNotice('Independent approval recorded.')
     } catch (error) { setNotice(error instanceof Error ? error.message : 'Approval failed.') }
+  }
+  function revoke() {
+    try { setLedger(saveRiskLedger(window.localStorage, revokeRiskApproval(ledger))); setNotice('Risk approval revoked.') }
+    catch (error) { setNotice(error instanceof Error ? error.message : 'Revocation failed.') }
   }
   return <div className="suite-page">
     <header className="suite-title"><div><small>RISK / EFFECTIVE SNAPSHOT</small>
@@ -40,7 +45,9 @@ export function PortfolioRiskSnapshotPage() {
       <label>Independent approver <input value={actor} onChange={event => { setActor(event.target.value); }} /></label>
       <label><input type="checkbox" checked={independent} onChange={event => { setIndependent(event.target.checked); }} /> Independent from portfolio manager</label>
       <button disabled={Boolean(snapshot.approvedBy)} onClick={approve}>Approve snapshot</button>
+      {snapshot.approvedBy && <button onClick={revoke}>Revoke risk approval</button>}
       <p>{snapshot.approvedBy ? `Approved by ${snapshot.approvedBy}` : 'Approval pending'}</p>
+      <p>Risk revision {ledger.revision} · Corporate action {ledger.transformationApplied ? 'applied' : 'pending'}</p>
       <p role="status">{notice}</p>
     </section>
   </div>
