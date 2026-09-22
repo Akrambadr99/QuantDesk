@@ -1,0 +1,22 @@
+import { expect, test } from '@playwright/test'
+
+test('named checker request survives navigation and releases corporate action', async ({ page }) => {
+  await page.goto('/portfolios/PF-GLOBAL/snapshots/2026-09-14')
+  await page.getByRole('button', { name: 'Refresh stale quote evidence' }).click()
+  await page.getByLabel('Independent approver').fill('R. Shah')
+  await page.getByRole('button', { name: 'Request independent review' }).click()
+  await expect(page.getByLabel('Risk review inbox')).toContainText('R. Shah · open')
+  await page.goto('/portfolios/PF-GLOBAL/actions/CA-117?ratio=1')
+  await expect(page.getByRole('button', { name: 'Approve position transformation' })).toBeDisabled()
+  await page.goto('/portfolios/PF-GLOBAL/snapshots/2026-09-14')
+  await page.getByLabel('Independent approver').fill('R. Shah')
+  await page.getByLabel('Independent from portfolio manager').check()
+  await expect(page.getByLabel('Risk review inbox')).toContainText('R. Shah · open')
+  await page.getByRole('button', { name: 'Approve snapshot' }).click()
+  await expect(page.getByLabel('Risk review inbox')).toContainText('R. Shah · completed')
+  await page.goto('/portfolios/PF-GLOBAL/actions/CA-117?ratio=1')
+  await page.getByLabel('Decision authority').selectOption('independent approver')
+  await page.getByRole('button', { name: 'Review current risk snapshot' }).click()
+  await page.getByRole('button', { name: 'Approve position transformation' }).click()
+  await expect(page.getByRole('status')).toContainText('Position transformation applied')
+})

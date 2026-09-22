@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { issuerWeights, riskFindings, snapshotValue } from './riskSnapshot'
-import { approveRisk, readRiskLedger, refreshRiskQuotes, revokeRiskApproval, riskApprovalPolicy, saveRiskLedger } from './riskLedger'
+import { approveRisk, checkerInbox, readRiskLedger, refreshRiskQuotes, requestRiskReview, revokeRiskApproval, riskApprovalPolicy, saveRiskLedger } from './riskLedger'
 export function PortfolioRiskSnapshotPage() {
   const { portfolioId, asOf } = useParams()
   const [ledger, setLedger] = useState(() => readRiskLedger(window.localStorage))
@@ -20,6 +20,10 @@ export function PortfolioRiskSnapshotPage() {
       setLedger(saveRiskLedger(window.localStorage, approveRisk(ledger, actor, independent)))
       setNotice('Independent approval recorded.')
     } catch (error) { setNotice(error instanceof Error ? error.message : 'Approval failed.') }
+  }
+  function requestReview() {
+    try { setLedger(saveRiskLedger(window.localStorage, requestRiskReview(ledger, ledger.maker, actor))); setNotice('Risk review assigned to independent checker.') }
+    catch (error) { setNotice(error instanceof Error ? error.message : 'Review request failed.') }
   }
   function revoke() {
     try { setLedger(saveRiskLedger(window.localStorage, revokeRiskApproval(ledger))); setNotice('Risk approval revoked.') }
@@ -45,8 +49,13 @@ export function PortfolioRiskSnapshotPage() {
       <button onClick={refreshQuotes} disabled={!findings.some(item => item.code === 'STALE_PRICE')}>Refresh stale quote evidence</button>
       <p>Snapshot maker: {ledger.maker} · Approval queue: {approvalPolicy.queue}</p>
       <label>Independent approver <input value={actor} onChange={event => { setActor(event.target.value); }} /></label>
+      <button onClick={requestReview} disabled={!actor.trim() || Boolean(snapshot.approvedBy)}>Request independent review</button>
       <label><input type="checkbox" checked={independent} onChange={event => { setIndependent(event.target.checked); }} /> Independent from portfolio manager</label>
       <button disabled={!approvalPolicy.allowed} onClick={approve}>Approve snapshot</button>
+      {(ledger.riskReviews ?? []).length > 0 && <div aria-label="Risk review inbox">
+        <h3>Checker worklist</h3>{(ledger.riskReviews ?? []).map(item => <p key={item.id}>{item.id} · {item.assignee} · {item.status} · snapshot revision {item.sourceRevision}</p>)}
+        <p>{checkerInbox(ledger, actor).length} assigned to current checker</p>
+      </div>}
       {actor && independent && approvalPolicy.blockers.map(item => <p key={item}>{item}</p>)}
       {snapshot.approvedBy && <button onClick={revoke}>Revoke risk approval</button>}
       <p>{snapshot.approvedBy ? `Approved by ${snapshot.approvedBy}` : 'Approval pending'}</p>
