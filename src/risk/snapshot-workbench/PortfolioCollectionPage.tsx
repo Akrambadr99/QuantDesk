@@ -1,3 +1,7 @@
+import { portfolioTriage } from './collectionTriage'
+import { withCollectionView } from '../../workspace/collectionExplorer'
+import { useCollectionExplorer } from '../../workspace/useCollectionExplorer'
+import { ExplorerControls, ExplorerPagination, ExplorerSelection } from '../../workspace/CollectionExplorerControls'
 import { recordDetailPath, recordDecisionPath } from './recordLinks'
 import { Link } from 'react-router-dom'
 import { saveCurrentCollection } from '../../workspace/recordStorage'
@@ -5,23 +9,24 @@ import { useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { riskCheckers } from './checkerWorkload'
 import { archivePortfolio, bulkRefreshPortfolios, claimPortfolioReview, createPortfolio,
-  portfolioReviewInbox, portfolioRows, portfolioSummary, readPortfolioCollection,
+  portfolioReviewInbox, portfolioSummary, readPortfolioCollection,
   refreshPortfolioQuotes, savePortfolioCollection, setQuoteBookValidity } from './portfolioCollection'
 
 export function PortfolioCollectionPage() {
   const [collection, setCollection] = useState(() => readPortfolioCollection(window.localStorage))
   const [params, setParams] = useSearchParams()
-  const [query, setQuery] = useState('')
-  const [filter, setFilter] = useState('active')
   const [checkerId, setCheckerId] = useState('checker-amina')
   const [checked, setChecked] = useState<string[]>([])
   const [newId, setNewId] = useState('')
   const [notice, setNotice] = useState('')
   const selectedId = params.get('portfolio') ?? 'PF-INCOME'
   const selected = collection.portfolios.find(item => item.id === selectedId)
-  const rows = portfolioRows(collection, query, filter)
   const inbox = portfolioReviewInbox(collection)
   const summary = portfolioSummary(collection)
+  const policy = portfolioTriage(collection)
+  const explorer = useCollectionExplorer(collection.portfolios, policy)
+  const rows = explorer.rows
+  const selectedOutsideView = selected && !rows.some(record => record.id === selected.id)
   function choose(id: string) { setParams(current => { const next = new URLSearchParams(current); next.set('portfolio', id); return next }) }
   function persist(next: typeof collection, message: string) { try { setCollection(saveCurrentCollection(window.localStorage, collection, next, readPortfolioCollection, savePortfolioCollection)); setNotice(message); return true } catch (error) { setNotice(error instanceof Error ? error.message : 'Save failed. Your input is preserved.'); return false } }
   function run(action: () => typeof collection, success: string) {
@@ -38,6 +43,7 @@ export function PortfolioCollectionPage() {
       <article><small>Stale reviews</small><strong>{summary.stale}</strong></article>
     </section>
     <section className="suite-card" aria-label="Checker queue"><h2>Independent review queue</h2>
+      <p>This queue includes all active portfolios. Collection view filters apply only to the list below.</p>
       {inbox.length ? <ul>{inbox.map(item => <li key={item.portfolioId + item.reviewId}>
         <button onClick={() => { choose(item.portfolioId) }}>{item.portfolioId}</button> · {item.reviewId} ·
         {item.assignee} · {item.findingCount} findings · {item.actionable ? 'current' : 'blocked'}
@@ -47,10 +53,7 @@ export function PortfolioCollectionPage() {
       </select></label>
     </section>
     <section className="suite-card" aria-label="Portfolio collection"><h2>Portfolios</h2>
-      <div className="filters"><label>Search portfolios <input value={query} onChange={event => { setQuery(event.target.value) }} /></label>
-        <label>Show <select value={filter} onChange={event => { setFilter(event.target.value) }}>
-          <option value="active">Active</option><option value="archived">Archived</option><option value="all">All</option>
-        </select></label></div>
+      <ExplorerControls noun="portfolios" view={explorer.view} onChange={explorer.setView} states={policy.states} onReset={explorer.reset} />
       {rows.length ? <ul>{rows.map(record => <li key={record.id}>
         <label><input type="checkbox" checked={checked.includes(record.id)} onChange={event => {
           setChecked(current => event.target.checked ? [...current, record.id] : current.filter(id => id !== record.id))
@@ -58,7 +61,10 @@ export function PortfolioCollectionPage() {
         <button aria-current={selectedId === record.id ? 'true' : undefined} onClick={() => { choose(record.id) }}>
           {record.id} · {record.mandateId} · {record.ledger.snapshot.approvedBy ? 'approved' : 'pending'}
         </button><small> r{record.ledger.revision} · {record.quoteBookId}{record.archived ? ' · archived' : ''}</small>
-      </li>)}</ul> : <p>No portfolios match this view.</p>}
+      <small> · Work state: {policy.states.find(option => option.value === policy.state(record))?.label}</small></li>)}</ul> : <p>No portfolios match this view. Reset the view or adjust the search and work state.</p>}
+      <ExplorerPagination page={explorer.page} pageCount={explorer.pageCount} matchingCount={explorer.matchingCount}
+        onPageChange={page => { explorer.setView({ page }) }} />
+      <ExplorerSelection noun="portfolios" selected={checked} visible={rows.map(record => record.id)} onChange={setChecked} />
       <button disabled={!checked.length} onClick={() => {
         const result = bulkRefreshPortfolios(collection, checked, 'portfolio manager')
         persist(result.collection, `${String(result.updated.length)} refreshed; ${String(result.skipped.length)} current; ${String(result.blocked.length)} blocked.`)
@@ -69,6 +75,9 @@ export function PortfolioCollectionPage() {
       </form>
     </section>
     <section className="suite-card" aria-label="Selected portfolio"><h2>{selected?.id ?? 'Select a portfolio'}</h2>
+      {!selected && <p>The requested portfolio was not found. Choose a record from the collection.</p>}
+      {selectedOutsideView && <p>The selected portfolio is outside this page. Detail actions still apply to {selected.id}.{' '}
+        <button onClick={() => { explorer.setView({ query: selected.id, scope: 'all', state: 'all', sort: 'id-asc', page: 1 }) }}>Show selected record</button></p>}
       {selected && <><p>Mandate {selected.mandateId} · Quote book {selected.quoteBookId} · Risk revision {selected.ledger.revision}</p>
         <p>Maker {selected.ledger.maker} · Approval {selected.ledger.snapshot.approvedBy ?? 'pending'} ·
           Review {selected.ledger.riskReviews?.find(item => item.status === 'open')?.assignee ?? 'none'}</p>
@@ -93,7 +102,7 @@ export function PortfolioCollectionPage() {
       <ol>{collection.events.toReversed().slice(0, 8).map(item => <li key={item.sequence}>
         {item.action} · {item.targetId} · related {item.relatedIds.join(', ') || 'none'} · {item.actor}
       </li>)}</ol></section>
-    <nav aria-label="Selected record workflows">{selected && !selected.archived && <><Link to={recordDetailPath(selected)}>Open record details</Link>{' · '}<Link to={recordDecisionPath(selected)}>Open decision workflow</Link></>} <button onClick={() => { try { setCollection(readPortfolioCollection(window.localStorage)); setNotice('Workspace refreshed; selection preserved.') } catch (error) { setNotice(error instanceof Error ? error.message : 'Refresh failed.') } }}>Refresh workspace</button></nav>
+    <nav aria-label="Selected record workflows">{selected && !selected.archived && <><Link to={withCollectionView(recordDetailPath(selected), params)}>Open record details</Link>{' · '}<Link to={withCollectionView(recordDecisionPath(selected), params)}>Open decision workflow</Link></>} <button onClick={() => { try { setCollection(readPortfolioCollection(window.localStorage)); setNotice('Workspace refreshed; selection preserved.') } catch (error) { setNotice(error instanceof Error ? error.message : 'Refresh failed.') } }}>Refresh workspace</button></nav>
     <p role="status">{notice}</p>
   </main>
 }
