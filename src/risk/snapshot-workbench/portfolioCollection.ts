@@ -1,4 +1,4 @@
-import type { StoragePort } from '../../workspace/repository'
+import type { StoragePort, StorageReader } from '../../platform/storage-port'
 import { readStored, writeStored } from '../../workspace/storageValidation'
 import { portfolioCollectionRule } from './collectionValidation'
 import { approveRisk, initialRiskLedger, readRiskLedger, refreshRiskQuotes, requestRiskReview } from './riskLedger'
@@ -30,7 +30,7 @@ export function seedPortfolioCollection(legacy: RiskLedger = initialRiskLedger):
     { id: 'Q-MARINER', revision: 1, valid: true, issuer: 'Mariner' },
   ], events: [] }
 }
-export function readPortfolioCollection(storage: StoragePort): PortfolioCollection {
+export function readPortfolioCollection(storage: StorageReader): PortfolioCollection {
   return readStored(storage, key, portfolioCollectionRule, () => seedPortfolioCollection(readRiskLedger(storage)),
     'quantdesk:pf-global:risk-approval:v1')
 }

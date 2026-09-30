@@ -1,4 +1,4 @@
-import type { StoragePort } from '../../workspace/repository'
+import type { StoragePort, StorageReader } from '../../platform/storage-port'
 import { approveSnapshot, baselineSnapshot } from './riskSnapshot'
 import type { RiskSnapshot } from './riskSnapshot'
 
@@ -24,7 +24,7 @@ export interface RiskReview {
 }
 const key = 'quantdesk:pf-global:risk-approval:v1'
 export const initialRiskLedger: RiskLedger = { snapshot: baselineSnapshot, maker: 'portfolio manager', approvalRevision: null, riskReviews: [], transformationApplied: false, transformationRequestId: null, revision: 0, history: [] }
-export function readRiskLedger(storage: StoragePort): RiskLedger {
+export function readRiskLedger(storage: StorageReader): RiskLedger {
   const raw = storage.getItem(key)
   if (!raw) return initialRiskLedger
   const value: unknown = JSON.parse(raw)
