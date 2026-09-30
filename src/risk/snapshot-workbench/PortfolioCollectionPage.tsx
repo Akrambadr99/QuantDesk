@@ -1,3 +1,6 @@
+import { recordDetailPath, recordDecisionPath } from './recordLinks'
+import { Link } from 'react-router-dom'
+import { saveCurrentCollection } from '../../workspace/recordStorage'
 import { useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { riskCheckers } from './checkerWorkload'
@@ -20,10 +23,10 @@ export function PortfolioCollectionPage() {
   const inbox = portfolioReviewInbox(collection)
   const summary = portfolioSummary(collection)
   function choose(id: string) { setParams(current => { const next = new URLSearchParams(current); next.set('portfolio', id); return next }) }
-  function persist(next: typeof collection, message: string) { setCollection(savePortfolioCollection(window.localStorage, next)); setNotice(message) }
+  function persist(next: typeof collection, message: string) { try { setCollection(saveCurrentCollection(window.localStorage, collection, next, readPortfolioCollection, savePortfolioCollection)); setNotice(message); return true } catch (error) { setNotice(error instanceof Error ? error.message : 'Save failed. Your input is preserved.'); return false } }
   function run(action: () => typeof collection, success: string) {
-    try { persist(action(), success) }
-    catch (error) { setNotice(error instanceof Error ? error.message : 'Portfolio operation failed.') }
+    try { return persist(action(), success) }
+    catch (error) { setNotice(error instanceof Error ? error.message : 'Portfolio operation failed.'); return false }
   }
   return <main className="suite-page">
     <header className="suite-title"><div><small>RISK / INDEPENDENT REVIEW</small><h1>Portfolio review workspace</h1>
@@ -60,7 +63,7 @@ export function PortfolioCollectionPage() {
         const result = bulkRefreshPortfolios(collection, checked, 'portfolio manager')
         persist(result.collection, `${String(result.updated.length)} refreshed; ${String(result.skipped.length)} current; ${String(result.blocked.length)} blocked.`)
       }}>Refresh selected quotes</button>
-      <form onSubmit={event => { event.preventDefault(); run(() => createPortfolio(collection, newId, 'global', 'Q-ORION'), 'Portfolio created.'); setNewId('') }}>
+      <form onSubmit={event => { event.preventDefault(); if (run(() => createPortfolio(collection, newId, 'global', 'Q-ORION'), 'Portfolio created.')) setNewId('') }}>
         <label>New portfolio ID <input value={newId} onChange={event => { setNewId(event.target.value) }} pattern="PF-[A-Z0-9-]+" required /></label>
         <button type="submit">Create global portfolio</button>
       </form>
@@ -90,6 +93,7 @@ export function PortfolioCollectionPage() {
       <ol>{collection.events.toReversed().slice(0, 8).map(item => <li key={item.sequence}>
         {item.action} · {item.targetId} · related {item.relatedIds.join(', ') || 'none'} · {item.actor}
       </li>)}</ol></section>
+    <nav aria-label="Selected record workflows">{selected && !selected.archived && <><Link to={recordDetailPath(selected)}>Open record details</Link>{' · '}<Link to={recordDecisionPath(selected)}>Open decision workflow</Link></>} <button onClick={() => { try { setCollection(readPortfolioCollection(window.localStorage)); setNotice('Workspace refreshed; selection preserved.') } catch (error) { setNotice(error instanceof Error ? error.message : 'Refresh failed.') } }}>Refresh workspace</button></nav>
     <p role="status">{notice}</p>
   </main>
 }
