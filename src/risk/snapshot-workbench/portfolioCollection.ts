@@ -1,4 +1,6 @@
 import type { StoragePort } from '../../workspace/repository'
+import { readStored, writeStored } from '../../workspace/storageValidation'
+import { portfolioCollectionRule } from './collectionValidation'
 import { approveRisk, initialRiskLedger, readRiskLedger, refreshRiskQuotes, requestRiskReview } from './riskLedger'
 import type { RiskLedger } from './riskLedger'
 import { checkerWorkInbox, claimRiskReview } from './checkerWorkload'
@@ -29,17 +31,11 @@ export function seedPortfolioCollection(legacy: RiskLedger = initialRiskLedger):
   ], events: [] }
 }
 export function readPortfolioCollection(storage: StoragePort): PortfolioCollection {
-  const raw = storage.getItem(key)
-  if (!raw) return seedPortfolioCollection(readRiskLedger(storage))
-  const value: unknown = JSON.parse(raw)
-  if (!value || typeof value !== 'object' || !('portfolios' in value) || !Array.isArray(value.portfolios) ||
-    !('quoteBooks' in value) || !Array.isArray(value.quoteBooks) || !('events' in value) || !Array.isArray(value.events))
-    throw new Error('Invalid portfolio collection.')
-  return value as PortfolioCollection
+  return readStored(storage, key, portfolioCollectionRule, () => seedPortfolioCollection(readRiskLedger(storage)),
+    'quantdesk:pf-global:risk-approval:v1')
 }
 export function savePortfolioCollection(storage: StoragePort, collection: PortfolioCollection): PortfolioCollection {
-  storage.setItem(key, JSON.stringify(collection))
-  return collection
+  return writeStored(storage, key, portfolioCollectionRule, collection)
 }
 export function portfolioById(collection: PortfolioCollection, id: string): PortfolioRecord {
   const record = collection.portfolios.find(item => item.id === id)

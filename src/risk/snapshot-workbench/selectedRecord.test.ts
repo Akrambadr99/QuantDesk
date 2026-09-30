@@ -83,7 +83,7 @@ describe('selected portfolio persistence', () => {
     const storage = new MemoryStorage(), bound = openSelectedRecord(storage)
     const changed = edit(readRiskLedger(bound))
     storage.fail = true
-    expect(() => saveRiskLedger(bound, changed)).toThrow('Storage full')
+    expect(() => saveRiskLedger(bound, changed)).toThrow('Browser storage rejected the save.')
     storage.fail = false
     saveRiskLedger(bound, changed)
     expect(readRiskLedger(openSelectedRecord(storage))).toEqual(changed)
